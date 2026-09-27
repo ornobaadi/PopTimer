@@ -397,3 +397,6 @@ CI: GitHub Actions running `flutter analyze` and `flutter test` on every push, r
 | State | Riverpod | Bloc | Same as Pop Calc |
 | Storage | `shared_preferences` | drift/Hive | Data is a few small JSON blobs |
 | Monetization | Free + one-time Pro | Paid, ads | Same proven model as Pop Calc |
+| UI label font | Bebas Neue for headings, labels and hints; Antonio for descriptions and the countdown line (as in Pop Calc) | Antonio everywhere (`design.md` 3) | Pop Timer must read as Pop Calc's sibling; Pop Calc's shipped UI uses Bebas Neue for all labels |
+| Application id | `com.ornobaadi.poptimer` | `com.example.poptimer` | Matches `com.ornobaadi.popcalc` |
+| +1 min after time's up | Rings again one minute from the tap (`duration = elapsed + 1 min`) | Add a minute to the original duration (would still be in overtime) | The done notification's "+1 min" must mean "one more minute from now" |

@@ -1,4 +1,4 @@
-package com.example.poptimer
+package com.ornobaadi.poptimer
 
 import io.flutter.embedding.android.FlutterActivity
 
