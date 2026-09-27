@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:poptimer/app/app.dart';
 import 'package:poptimer/core/engine/presets.dart';
 import 'package:poptimer/core/render/glyph_renderer.dart';
 import 'package:poptimer/core/theme/skins.dart';
 import 'package:poptimer/features/timer/presentation/widgets/preset_pager.dart';
 import 'package:poptimer/features/timer/presentation/widgets/sculpted_numeral.dart';
+
+import 'widget/app_harness.dart';
 
 void main() {
   void phone(WidgetTester tester) {
@@ -23,8 +23,8 @@ void main() {
   }
 
   testWidgets('opens on the 5 minute preset with its neighbours peeking', (tester) async {
-    phone(tester);
-    await tester.pumpWidget(const ProviderScope(child: PopTimerApp()));
+    final app = AppHarness(tester);
+    await app.pumpApp();
 
     expect(find.text('TAP TO START'), findsOneWidget);
     expect(find.bySemanticsLabel('Settings'), findsOneWidget);
@@ -35,13 +35,15 @@ void main() {
     expect(texts, containsAll(['3', '5', '10']));
   });
 
-  testWidgets('swiping up snaps to the next preset', (tester) async {
-    phone(tester);
-    await tester.pumpWidget(const ProviderScope(child: PopTimerApp()));
+  testWidgets('swiping up snaps to the next preset and remembers it', (tester) async {
+    final app = AppHarness(tester);
+    await app.pumpApp();
 
     await tester.fling(find.byType(PageView), const Offset(0, -300), 1500);
     await tester.pumpAndSettle();
     expect(centred(tester).text, '10');
+    expect(app.store.lastPresetMinutes, 10);
+    expect(app.haptics.events, ['pageSnap']);
   });
 
   testWidgets('the last page is the + stopwatch', (tester) async {

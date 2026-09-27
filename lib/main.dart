@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app.dart';
+import 'core/platform/platform_providers.dart';
+import 'core/storage/session_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Loaded before runApp so the session is restored before the first frame.
+  final prefs = await SharedPreferences.getInstance();
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
@@ -17,5 +23,10 @@ Future<void> main() async {
     ),
   );
 
-  runApp(const ProviderScope(child: PopTimerApp()));
+  runApp(
+    ProviderScope(
+      overrides: [sessionStoreProvider.overrideWithValue(PrefsSessionStore(prefs))],
+      child: const PopTimerApp(),
+    ),
+  );
 }

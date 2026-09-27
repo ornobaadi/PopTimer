@@ -70,15 +70,15 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
 
 **Goal:** it works in the foreground and feels great.
 
-- [ ] `SessionController` with every intent from `architecture.md` section 4, persisting through `SessionStore`, with fake platform services in tests.
-- [ ] Frame-synced tick provider (UI owns the `Ticker`).
-- [ ] Light-up, speed lines (pooled, one `Ticker`), minute sink/rise, last-10 s punch.
-- [ ] Night ↔ Paper radial reveal.
-- [ ] Hold ring (cancel, reset, restart, custom picker).
-- [ ] Haptics service (from Pop Calc's `AppHaptics`) on every event in `design.md` section 8.
-- [ ] Reduce Motion and Lite effects.
+- [x] `SessionController` with every intent from `architecture.md` section 4, persisting through `SessionStore`, with fake platform services in tests.
+- [x] Frame-synced tick provider (UI owns the `Ticker`).
+- [x] Light-up, speed lines (pooled, one `Ticker`), minute sink/rise, last-10 s punch.
+- [x] Night ↔ Paper radial reveal.
+- [x] Hold ring (cancel, reset, restart). The Browse hold opens the custom picker, which ships with it in Phase 5.
+- [x] Haptics service (from Pop Calc's `AppHaptics`) on every event in `design.md` section 8.
+- [x] Reduce Motion and Lite effects.
 
-**Exit criteria:** 60 fps on a mid-range device, every gesture in PRD 5.2 works in the foreground.
+**Exit criteria:** 60 fps on a mid-range device, every gesture in PRD 5.2 works in the foreground. Status: **DONE in code** (77/77 tests); 60 fps still needs profiling on a real device.
 
 ---
 
@@ -100,7 +100,7 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
 
 ## Phase 5: Free feature completion and closed-test build
 
-- [ ] Custom duration picker with recents.
+- [ ] Custom duration picker with recents, opened by holding in Browse.
 - [ ] Settings sheet (Pop Calc layout): haptics, minute tick haptic, alarm sound, keep screen on, Lite effects.
 - [ ] Accessibility pass: Semantics, custom actions for holds, announcements.
 - [ ] App icon (adaptive + monochrome), splash, notification small icon, all in the Pop Calc family.
