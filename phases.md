@@ -53,16 +53,16 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
 
 **Goal:** it looks right standing still, and reads as a Pop Calc sibling.
 
-- [ ] Skin tokens: Graphite Night + Paper surfaces (`core/theme/skin.dart`, `skins.dart`), `ThemeData` wiring.
-- [ ] `GlyphRenderer` interface + `ProceduralGlyphRenderer` built from Pop Calc's `ExtrudedNumberPainter`, adding the top-right light model, long cast shadow and chamfer pass.
-- [ ] Hand-built `+` path with chiseled arm ends.
-- [ ] Vertical snapping preset pager with peeking neighbors.
-- [ ] Browse screen: numeral, TAP TO START hint + ring, settings ring (top-right).
-- [ ] Countdown line, Paper surface screens (stopwatch `+`, stopwatch `3`, timer done `0`).
-- [ ] Grain overlay (from Pop Calc).
-- [ ] Golden tests for idle, lit, paused, done, stopwatch `+` and `3`.
+- [x] Skin tokens: Graphite Night + Paper surfaces (`core/theme/skin.dart`, `skins.dart`), `ThemeData` wiring.
+- [x] `GlyphRenderer` interface + `ProceduralGlyphRenderer` built from Pop Calc's `ExtrudedNumberPainter`, adding the top-right light model, long cast shadow and chamfer pass.
+- [x] Hand-built `+` path with chiseled arm ends.
+- [x] Vertical snapping preset pager with peeking neighbors.
+- [x] Browse screen: numeral, TAP TO START hint + ring, settings ring (top-right).
+- [x] Countdown line, Paper surface screens (stopwatch `+`, stopwatch `3`, timer done `0`).
+- [x] Grain overlay (from Pop Calc).
+- [x] Golden tests for idle, lit, paused, done, stopwatch `+` and `3`.
 
-**Exit criteria:** side by side with the references, every static state looks right.
+**Exit criteria:** side by side with the references, every static state looks right. Status: **DONE in code** (48/48 tests, 9 goldens in `test/golden/goldens/`); still needs a look on a real device.
 
 ---
 
