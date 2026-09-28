@@ -18,7 +18,8 @@ class SessionView extends StatelessWidget {
   final GlyphMaterial material;
   final String line;
   final String semanticsLabel;
-  final NumeralChange change;
+  /// Device tilt for the numeral parallax.
+  final Stream<Offset>? deviceTilt;
 
   /// Painted between the surface and the numeral (speed lines).
   final Widget? backdrop;
@@ -35,7 +36,7 @@ class SessionView extends StatelessWidget {
     required this.material,
     required this.line,
     required this.semanticsLabel,
-    this.change = NumeralChange.riseSink,
+    this.deviceTilt,
     this.backdrop,
     this.blinkLine = false,
     this.showSettings = false,
@@ -67,7 +68,8 @@ class SessionView extends StatelessWidget {
                   child: AnimatedNumeral(
                     text: numeral,
                     material: material,
-                    change: change,
+                    interactive: true,
+                    deviceTilt: deviceTilt,
                     lite: lite,
                     reduceMotion: reduceMotion,
                   ),

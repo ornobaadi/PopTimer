@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/settings/application/settings_providers.dart';
 import '../engine/clock.dart';
 import '../storage/session_store.dart';
 import 'alarm_scheduler.dart';
@@ -23,4 +24,6 @@ final ongoingNotifierProvider = Provider<OngoingNotifier>((ref) => const NoopOng
 
 final soundServiceProvider = Provider<SoundService>((ref) => const NoopSoundService());
 
-final hapticsServiceProvider = Provider<HapticsService>((ref) => AppHapticsService());
+final hapticsServiceProvider = Provider<HapticsService>(
+  (ref) => AppHapticsService(enabled: ref.watch(settingsProvider).hapticsEnabled),
+);

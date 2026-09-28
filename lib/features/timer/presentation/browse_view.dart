@@ -5,10 +5,9 @@ import '../../../core/theme/skin.dart';
 import 'widgets/preset_pager.dart';
 import 'widgets/settings_ring.dart';
 import 'widgets/surface_background.dart';
-import 'widgets/tap_hint.dart';
-import 'widgets/timer_layout.dart';
 
-/// Browse (idle): dark-on-dark numerals on Night, TAP TO START, settings.
+/// Browse (idle): dark-on-dark numerals on Night and the settings ring.
+/// First-run instructions come later with onboarding.
 class BrowseView extends StatelessWidget {
   final SurfaceTokens night;
   final List<int> presets;
@@ -39,10 +38,6 @@ class BrowseView extends StatelessWidget {
           material: GlyphMaterial.idle(night),
           lite: lite,
           onPageChanged: onPageChanged,
-        ),
-        Align(
-          alignment: const Alignment(0, TimerLayout.hintAlignY),
-          child: TapHint(ink: night.ink),
         ),
         SafeArea(
           child: Align(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/engine/session.dart';
 import '../../../core/engine/session_math.dart';
+import '../../../core/platform/device_tilt.dart';
 import '../../../core/platform/platform_providers.dart';
 import '../../../core/render/glyph_renderer.dart';
 import '../../../core/theme/skin.dart';
@@ -10,12 +11,11 @@ import '../application/session_controller.dart';
 import '../application/session_state.dart';
 import '../application/tick_provider.dart';
 import 'session_view.dart';
-import 'widgets/animated_numeral.dart';
 import 'widgets/speed_lines.dart';
 
 /// Drives a [SessionView] from the clock. Owns the frame ticker: each frame
 /// derives the numeral and line from the stored timestamps, rebuilds only
-/// when either changes, and fires the per-change motion and haptics.
+/// when either changes, and fires the per-change haptics.
 ///
 /// Takes the session as a parameter (instead of watching the controller) so
 /// a copy kept on screen during a surface reveal keeps showing its own state.
@@ -25,6 +25,7 @@ class SessionStage extends ConsumerStatefulWidget {
   final Skin skin;
   final bool lite;
   final bool reduceMotion;
+  final VoidCallback? onSettings;
 
   const SessionStage({
     super.key,
@@ -33,7 +34,12 @@ class SessionStage extends ConsumerStatefulWidget {
     required this.skin,
     this.lite = false,
     this.reduceMotion = false,
+    this.onSettings,
   });
+
+  /// A session younger than this gets the start swoosh; older ones (resumed,
+  /// restored after the app was killed) don't.
+  static const freshStart = Duration(seconds: 2);
 
   @override
   ConsumerState<SessionStage> createState() => _SessionStageState();
@@ -48,26 +54,28 @@ class _SessionStageState extends ConsumerState<SessionStage> with TickerProvider
 
   late String _numeral;
   late String _line;
-  NumeralChange _change = NumeralChange.riseSink;
-  int _burstKey = 0;
-
-  /// Whole seconds left on the last frame, to spot the 1:00 → 59 crossing.
-  int? _lastSeconds;
+  late bool _swoosh;
   bool _reportedZero = false;
 
   @override
   void initState() {
     super.initState();
-    _derive(ref.read(clockProvider).now(), initial: true);
+    final now = ref.read(clockProvider).now();
+    _swoosh = now.difference(widget.session.startedAt) < SessionStage.freshStart;
+    _derive(now, initial: true);
     _syncTicker();
   }
 
   @override
   void didUpdateWidget(SessionStage old) {
     super.didUpdateWidget(old);
+    if (old.session.startedAt != widget.session.startedAt) {
+      // A new session (restart): swoosh again.
+      _swoosh = true;
+      _reportedZero = false;
+    }
     if (old.session != widget.session) {
       _reportedZero = false;
-      _lastSeconds = null;
       _derive(ref.read(clockProvider).now(), initial: true);
     }
     _syncTicker();
@@ -98,38 +106,28 @@ class _SessionStageState extends ConsumerState<SessionStage> with TickerProvider
     if (initial) {
       _numeral = numeral;
       _line = line;
-      if (s is TimerSession) _lastSeconds = displaySeconds(remaining(s, now));
       return true;
     }
     final numeralChanged = numeral != _numeral;
-    if (numeralChanged) _onNumeralChange(s, now);
+    if (numeralChanged) _hapticFor(s, now);
     final changed = numeralChanged || line != _line;
     _numeral = numeral;
     _line = line;
     return changed;
   }
 
-  /// Motion and haptics for a new numeral (`design.md` section 7).
-  void _onNumeralChange(Session s, DateTime now) {
+  /// `design.md` section 8: a tick per minute, a click per last-10 second.
+  void _hapticFor(Session s, DateTime now) {
     final haptics = ref.read(hapticsServiceProvider);
     if (s is TimerSession) {
       final secs = displaySeconds(remaining(s, now));
-      final crossedMinute = (_lastSeconds ?? secs) >= 60 && secs < 60;
-      _lastSeconds = secs;
-      if (secs <= 0) return; // time's up is handled by the controller
-      if (secs >= 60 || crossedMinute) {
-        _change = NumeralChange.riseSink;
-        _burstKey++;
-        haptics.minuteTick();
-      } else if (secs <= 10) {
-        _change = NumeralChange.strongPunch;
-        _burstKey++;
+      if (secs <= 0) return; // time's up is the controller's
+      if (secs <= 10) {
         haptics.secondTick();
-      } else {
-        _change = NumeralChange.punch;
+      } else if (secs >= 59) {
+        haptics.minuteTick();
       }
     } else {
-      _change = NumeralChange.riseSink;
       haptics.minuteTick();
     }
   }
@@ -151,28 +149,28 @@ class _SessionStageState extends ConsumerState<SessionStage> with TickerProvider
       Mode.timerRunning => GlyphMaterial.lit(night),
       _ => GlyphMaterial.idle(tokens),
     };
-    final timerOnNight = mode == Mode.timerRunning || mode == Mode.timerPaused;
 
     return SessionView(
       tokens: tokens,
       numeral: _numeral,
       material: material,
       line: _line,
-      change: _change,
       semanticsLabel: _semanticsLabel(mode),
-      backdrop: timerOnNight
+      deviceTilt: ref.watch(deviceTiltProvider),
+      backdrop: _swoosh && widget.session is TimerSession
           ? SpeedLines(
+              // Keyed by start so a restart plays a fresh swoosh.
+              key: ValueKey(widget.session.startedAt),
               color: night.speedLine,
-              paused: mode == Mode.timerPaused,
               lite: widget.lite,
               reduceMotion: widget.reduceMotion,
-              burstKey: _burstKey,
             )
           : null,
       blinkLine: mode.isPaused,
       showSettings: mode.isPaused,
       lite: widget.lite,
       reduceMotion: widget.reduceMotion,
+      onSettings: widget.onSettings,
     );
   }
 

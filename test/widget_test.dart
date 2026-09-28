@@ -26,34 +26,34 @@ void main() {
     final app = AppHarness(tester);
     await app.pumpApp();
 
-    expect(find.text('TAP TO START'), findsOneWidget);
     expect(find.bySemanticsLabel('Settings'), findsOneWidget);
     expect(find.bySemanticsLabel('5 minute timer'), findsOneWidget);
     expect(centred(tester).text, '5');
-    // 3 above and 10 below are built and partly on screen.
+    // 10 above and 3 below are built and partly on screen.
+    expect(find.text('TAP TO START'), findsNothing);
     final texts = tester.widgetList<SculptedNumeral>(find.byType(SculptedNumeral)).map((n) => n.text);
     expect(texts, containsAll(['3', '5', '10']));
   });
 
-  testWidgets('swiping up snaps to the next preset and remembers it', (tester) async {
+  testWidgets('swiping up brings in the smaller preset below and remembers it', (tester) async {
     final app = AppHarness(tester);
     await app.pumpApp();
 
     await tester.fling(find.byType(PageView), const Offset(0, -300), 1500);
     await tester.pumpAndSettle();
-    expect(centred(tester).text, '10');
-    expect(app.store.lastPresetMinutes, 10);
+    expect(centred(tester).text, '3');
+    expect(app.store.lastPresetMinutes, 3);
     expect(app.haptics.events, ['pageSnap']);
   });
 
-  testWidgets('the last page is the + stopwatch', (tester) async {
+  testWidgets('+ sits below 1 at the bottom', (tester) async {
     phone(tester);
     int? page;
     await tester.pumpWidget(
       MaterialApp(
         home: PresetPager(
           presets: defaultPresets,
-          initialIndex: defaultPresets.length - 1,
+          initialIndex: 0,
           material: _material,
           onPageChanged: (i) => page = i,
         ),

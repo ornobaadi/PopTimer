@@ -1,5 +1,7 @@
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
+import 'package:flutter/animation.dart' show Curves;
+import 'package:flutter/painting.dart';
 
 import 'glyph_paths.dart';
 import 'glyph_renderer.dart';
@@ -21,7 +23,7 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
 
   final int cacheSize;
   // Map literals keep insertion order, so the first key is the oldest.
-  final _cache = <String, Picture>{};
+  final _cache = <String, ui.Picture>{};
 
   /// Share of the box width a numeral may use before it shrinks.
   static const double maxWidthFraction = 0.84;
@@ -50,7 +52,7 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
 
     var picture = _cache.remove(key);
     if (picture == null) {
-      final recorder = PictureRecorder();
+      final recorder = ui.PictureRecorder();
       _draw(Canvas(recorder), size, text, material, depth, lightDir, lite);
       picture = recorder.endRecording();
       if (_cache.length >= cacheSize) {
@@ -70,6 +72,10 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
     Offset lightDir,
     bool lite,
   ) {
+    if (text != '+') {
+      _drawText(canvas, size, text, m, depth, lightDir, lite);
+      return;
+    }
     final run = layoutGlyphs(text);
     if (run.contours.isEmpty) return;
 
@@ -102,7 +108,7 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
       final layer = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
       if (!lite) {
         final sigma = glyphH * 0.018;
-        layer.imageFilter = ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+        layer.imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
       }
       canvas.saveLayer(null, layer);
       final solid = Paint()..color = m.castShadow.withValues(alpha: 1);
@@ -141,7 +147,7 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
     canvas.drawPath(
       facePath,
       Paint()
-        ..shader = Gradient.linear(bounds.topCenter, bounds.bottomCenter, [
+        ..shader = ui.Gradient.linear(bounds.topCenter, bounds.bottomCenter, [
           Color.lerp(m.face, const Color(0xFFFFFFFF), 0.035)!,
           m.face,
         ]),
@@ -170,6 +176,140 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
       }
     }
   }
+
+  /// Bebas Neue digit height as a share of font size.
+  static const double _capRatio = 0.7;
+
+  TextPainter _painter(String text, double fontSize, {Color? color, Paint? foreground}) =>
+      TextPainter(
+        text: TextSpan(
+          text: text,
+          style: TextStyle(
+            fontFamily: 'BebasNeue',
+            fontFamilyFallback: const ['Antonio'],
+            fontSize: fontSize,
+            height: 1,
+            letterSpacing: fontSize * 0.01,
+            color: foreground == null ? color : null,
+            foreground: foreground,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+
+  /// Digits the Pop Calc way: the Bebas Neue numeral extruded as a solid
+  /// block (stacked layers shaded from the deep side toward the rim), a long
+  /// blurred cast shadow, a top-lit face and a catch-light rim.
+  void _drawText(
+    Canvas canvas,
+    Size size,
+    String text,
+    GlyphMaterial m,
+    double depth,
+    Offset lightDir,
+    bool lite,
+  ) {
+    var fontSize = size.height / _capRatio;
+    var probe = _painter(text, fontSize, color: m.face);
+    final maxWidth = size.width * maxWidthFraction;
+    if (probe.width > maxWidth) {
+      fontSize *= maxWidth / probe.width;
+      probe = _painter(text, fontSize, color: m.face);
+    }
+    final glyphH = fontSize * _capRatio;
+    // Width-fitted numbers (two or three digits) are stretched back up to
+    // the full height: tall, condensed Bebas, like the references.
+    final stretch = (size.height / glyphH).clamp(1.0, maxStretch);
+    final light = _normalize(lightDir);
+    // Offsets are drawn in the stretched space, so undo the stretch on y to
+    // keep the extrusion and shadow the same length in every direction.
+    Offset unstretched(Offset o) => Offset(o.dx, o.dy / stretch);
+    final extrude = unstretched(_normalize(-light) * glyphH * stretch * 0.06 * depth);
+    final shadow = unstretched(
+      _normalize(Offset(-light.dx * 0.78, -light.dy)) * glyphH * stretch * 0.2 * depth,
+    );
+
+    final baseline = probe.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+    final inkTop = baseline - glyphH;
+    canvas.save();
+    canvas.translate(0, size.height / 2);
+    canvas.scale(1, stretch);
+    canvas.translate(0, -size.height / 2);
+    final origin = Offset(
+      (size.width - probe.width) / 2 - extrude.dx / 2,
+      (size.height - glyphH) / 2 - inkTop - extrude.dy / 2,
+    );
+
+    // 1. Long cast shadow: the glyph stamped along [shadow], one layer.
+    if (depth > 0.01) {
+      final alpha = lite ? 0.3 : m.castShadow.a;
+      final layer = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
+      if (!lite) {
+        final sigma = glyphH * 0.02;
+        layer.imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+      }
+      canvas.saveLayer(null, layer);
+      final stamp = _painter(text, fontSize, color: m.castShadow.withValues(alpha: 1));
+      const stamps = 10;
+      for (var i = 0; i <= stamps; i++) {
+        stamp.paint(canvas, origin + shadow * (i / stamps));
+      }
+      canvas.restore();
+    }
+
+    // 2. Side walls: stacked layers from the far end to the face, darkest at
+    //    the back, catching a little light near the rim. Colors are grouped
+    //    so only a handful of paragraphs are laid out.
+    final dist = extrude.distance;
+    if (dist > 0.5) {
+      final steps = lite ? 8 : (dist / 0.6).clamp(24, 64).round();
+      const groups = 8;
+      final rim = Color.lerp(m.side, m.face, 0.28)!;
+      final deep = Color.lerp(m.side, const Color(0xFF000000), 0.35)!;
+      TextPainter? layer;
+      var layerGroup = -1;
+      for (var i = 0; i < steps; i++) {
+        final t = i / (steps - 1);
+        final group = (t * (groups - 1)).round();
+        if (group != layerGroup) {
+          layerGroup = group;
+          final c = Color.lerp(deep, rim, Curves.easeInCubic.transform(group / (groups - 1)))!;
+          layer = _painter(text, fontSize, color: c);
+        }
+        layer!.paint(canvas, origin + extrude * (1 - t));
+      }
+    }
+
+    // 3. Face, a touch lighter at the top.
+    final faceRect = Rect.fromLTWH(origin.dx, origin.dy + inkTop, probe.width, glyphH);
+    _painter(
+      text,
+      fontSize,
+      foreground: Paint()
+        ..shader = ui.Gradient.linear(faceRect.topCenter, faceRect.bottomCenter, [
+          Color.lerp(m.face, const Color(0xFFFFFFFF), 0.05)!,
+          m.face,
+        ]),
+    ).paint(canvas, origin);
+
+    // 4. Catch-light rim (Pop Calc's chamfer), plus a faint shaded rim offset
+    //    away from the light so edges read even on dark-on-dark.
+    if (!lite) {
+      final w = math.max(1.0, glyphH * 0.004);
+      _painter(
+        text,
+        fontSize,
+        foreground: Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w
+          ..color = m.bevelLight,
+      ).paint(canvas, origin + light * (w * 0.5));
+    }
+    canvas.restore();
+  }
+
+  /// Most a width-fitted number is stretched vertically.
+  static const double maxStretch = 1.8;
 
   /// Fills the band each edge of [pts] sweeps when moved by [by]. Every band
   /// is wound the same way so the non-zero fill is a clean union.

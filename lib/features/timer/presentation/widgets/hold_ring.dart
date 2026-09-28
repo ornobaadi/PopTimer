@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/semantics.dart';
 
 /// Whole-screen tap + hold-to-confirm gesture (`design.md` section 7).
@@ -70,6 +71,15 @@ class _HoldGestureAreaState extends State<HoldGestureArea>
     if (widget.onHold != null) _hold.forward(from: 0);
   }
 
+  /// Any drag (paging, tilting the numeral) aborts the hold. The tap
+  /// recognizer's cancel isn't enough: it's silent if the finger moves
+  /// before the press timeout.
+  void _onPointerMove(PointerMoveEvent e) {
+    if (_hold.velocity > 0 && (e.localPosition - _position).distance > kTouchSlop) {
+      _springBack();
+    }
+  }
+
   void _onTapUp(TapUpDetails d) {
     if (_completed) return;
     if (widget.onHold == null || _hold.value < _tapProgress) {
@@ -108,6 +118,7 @@ class _HoldGestureAreaState extends State<HoldGestureArea>
       },
       child: Listener(
         onPointerDown: _onPointerDown,
+        onPointerMove: _onPointerMove,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: _onTapUp,

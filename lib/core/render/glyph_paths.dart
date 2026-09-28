@@ -121,13 +121,18 @@ final Map<String, GlyphShape> glyphShapes = {
     ],
   ),
   '9': _rotated(_six),
-  // Wide bevel so each arm ends in a 4-sided pyramid, as in the references.
+  // Small, centred in a wide cell, with a bevel of half the arm width so the
+  // facets meet in ridges: each arm is a hip roof ending in a pyramid, as in
+  // the stopwatch references.
   '+': GlyphShape(
     [
-      GlyphContour(_pts([21, 20, 39, 20, 39, 41, 60, 41, 60, 59, 39, 59, 39, 80, 21, 80, 21, 59, 0, 59, 0, 41, 21, 41])),
+      GlyphContour(_pts([
+        25.5, 37, 34.5, 37, 34.5, 45.5, 43, 45.5, 43, 54.5, 34.5, 54.5, //
+        34.5, 63, 25.5, 63, 25.5, 54.5, 17, 54.5, 17, 45.5, 25.5, 45.5,
+      ])),
     ],
     advance: 60,
-    bevel: 8,
+    bevel: 4.5,
   ),
 };
 

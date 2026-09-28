@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/platform/platform_providers.dart';
 import '../../../core/theme/skin.dart';
 import '../../../core/theme/skin_provider.dart';
 import '../../settings/application/settings_providers.dart';
 import '../application/session_controller.dart';
 import '../application/session_state.dart';
+import '../../settings/presentation/settings_sheet.dart';
 import 'browse_view.dart';
 import 'session_stage.dart';
 import 'widgets/hold_ring.dart';
@@ -50,6 +52,11 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) _controller.onAppResumed();
+  }
+
+  void _openSettings() {
+    ref.read(hapticsServiceProvider).pageSnap();
+    SettingsSheet.show(context);
   }
 
   void _onTap(Offset position) {
@@ -107,6 +114,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
             initialIndex: state.selectedPresetIndex,
             lite: lite,
             onPageChanged: _controller.selectPreset,
+            onSettings: _openSettings,
           )
         : SessionStage(
             session: session,
@@ -114,6 +122,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
             skin: skin,
             lite: lite,
             reduceMotion: reduceMotion,
+            onSettings: _openSettings,
           );
 
     return PopScope(

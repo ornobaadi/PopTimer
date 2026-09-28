@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:poptimer/app/app.dart';
 import 'package:poptimer/core/engine/clock.dart';
 import 'package:poptimer/core/engine/session.dart';
+import 'package:poptimer/core/platform/device_tilt.dart';
 import 'package:poptimer/core/platform/platform_providers.dart';
 import 'package:poptimer/core/storage/session_store.dart';
 import 'package:poptimer/features/timer/presentation/widgets/animated_numeral.dart';
@@ -37,6 +38,7 @@ class AppHarness {
           ongoingNotifierProvider.overrideWithValue(FakeOngoingNotifier(log)),
           soundServiceProvider.overrideWithValue(sound),
           hapticsServiceProvider.overrideWithValue(haptics),
+          deviceTiltProvider.overrideWithValue(const Stream.empty()),
         ],
         child: const PopTimerApp(),
       ),

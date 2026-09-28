@@ -1,46 +1,46 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart';
 
 import '../../../../core/render/glyph_renderer.dart';
 import 'sculpted_numeral.dart';
 
-/// How the numeral reacts when its text changes.
-enum NumeralChange {
-  /// Minute changes: old sinks, new rises with a spring overshoot.
-  riseSink,
-
-  /// Seconds under a minute: a scale punch.
-  punch,
-
-  /// Last 10 seconds: a stronger punch.
-  strongPunch,
-}
-
-/// A [SculptedNumeral] with its motion (`design.md` section 7):
-/// material light-up / dim-down, minute sink/rise, and second punches.
+/// A [SculptedNumeral] with Pop Calc's motion:
+///
+/// * material light-up / dim-down when the state changes
+/// * Pop Calc's "type-up" when the number changes: the new numeral rises
+///   from below with a squash-and-stretch while its depth springs back
+/// * interactive 3D: drag to tilt the block in perspective (the extrusion
+///   and light follow), elastic spring back on release, plus device-tilt
+///   parallax from [deviceTilt]
+///
 /// All animation state lives here, never in the controller.
 class AnimatedNumeral extends StatefulWidget {
   final String text;
   final GlyphMaterial material;
-  final NumeralChange change;
   final bool lite;
   final bool reduceMotion;
+
+  /// Drag to tilt. Off in Browse, where vertical drags page.
+  final bool interactive;
+
+  /// Raw device tilt (-1..1 per axis); smoothed here.
+  final Stream<Offset>? deviceTilt;
 
   const AnimatedNumeral({
     super.key,
     required this.text,
     required this.material,
-    this.change = NumeralChange.riseSink,
     this.lite = false,
     this.reduceMotion = false,
+    this.interactive = false,
+    this.deviceTilt,
   });
 
   static const lightUp = Duration(milliseconds: 380);
   static const dimDown = Duration(milliseconds: 260);
-  static const minuteTick = Duration(milliseconds: 320);
-  static const secondPunch = Duration(milliseconds: 180);
+  static const typeUp = Duration(milliseconds: 280);
 
   @override
   State<AnimatedNumeral> createState() => _AnimatedNumeralState();
@@ -48,36 +48,52 @@ class AnimatedNumeral extends StatefulWidget {
 
 class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderStateMixin {
   late final AnimationController _material = AnimationController(vsync: this, value: 1);
-  late final AnimationController _swap = AnimationController(
+  late final AnimationController _type = AnimationController(
     vsync: this,
-    duration: AnimatedNumeral.minuteTick,
+    duration: AnimatedNumeral.typeUp,
     value: 1,
   );
-  late final AnimationController _punch = AnimationController(
+  late final AnimationController _depth = AnimationController(
     vsync: this,
-    duration: AnimatedNumeral.secondPunch,
+    duration: const Duration(milliseconds: 240),
     value: 1,
+  );
+  late final AnimationController _springBack = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
   );
 
   late GlyphMaterial _from = widget.material;
   Curve _materialCurve = Curves.easeOutCubic;
-  String? _previousText;
-  double _punchAmount = 0;
 
-  static final _rise = _SpringCurve(
-    const SpringDescription(mass: 1, stiffness: 450, damping: 24),
-    AnimatedNumeral.minuteTick,
-  );
+  Offset _drag = Offset.zero; // -1..1
+  Offset _dragAtRelease = Offset.zero;
+  Offset _accumulated = Offset.zero;
+  Offset _sensor = Offset.zero; // smoothed
+  StreamSubscription<Offset>? _tiltSub;
 
-  GlyphMaterial get _currentMaterial => GlyphMaterial.lerp(
-    _from,
-    widget.material,
-    _materialCurve.transform(_material.value),
-  );
+  @override
+  void initState() {
+    super.initState();
+    _subscribeTilt();
+    _springBack.addStatusListener((s) {
+      if (s == AnimationStatus.completed) _drag = Offset.zero;
+    });
+  }
+
+  void _subscribeTilt() {
+    _tiltSub?.cancel();
+    _tiltSub = widget.deviceTilt?.listen((raw) {
+      // Exponential smoothing for jitter-free parallax.
+      final next = _sensor * 0.86 + raw * 0.14;
+      if ((next - _sensor).distance > 0.002 && mounted) setState(() => _sensor = next);
+    }, onError: (Object _) {});
+  }
 
   @override
   void didUpdateWidget(AnimatedNumeral old) {
     super.didUpdateWidget(old);
+    if (old.deviceTilt != widget.deviceTilt) _subscribeTilt();
     if (old.material != widget.material) {
       // Start from wherever the last transition got to, so it's interruptible.
       _from = GlyphMaterial.lerp(_from, old.material, _materialCurve.transform(_material.value));
@@ -91,86 +107,105 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
       }
     }
     if (old.text != widget.text && !widget.reduceMotion) {
-      switch (widget.change) {
-        case NumeralChange.riseSink:
-          _previousText = old.text;
-          _swap.forward(from: 0);
-        case NumeralChange.punch || NumeralChange.strongPunch:
-          _previousText = null;
-          _swap.value = 1;
-          _punchAmount = widget.change == NumeralChange.strongPunch ? 0.06 : 0.03;
-          _punch.forward(from: 0);
-      }
+      _type.forward(from: 0);
+      _depth.forward(from: 0.15);
     }
   }
 
+  // ─── Drag to tilt ─────────────────────────────────────────────────────────
+
+  void _onPanStart(DragStartDetails _) {
+    _springBack.stop();
+    _accumulated = _drag * 110;
+  }
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    _accumulated += d.delta;
+    setState(() {
+      _drag = Offset(
+        (_accumulated.dx / 110).clamp(-1.0, 1.0),
+        (_accumulated.dy / 110).clamp(-1.0, 1.0),
+      );
+    });
+  }
+
+  void _release([Object? _]) {
+    _dragAtRelease = _drag;
+    _springBack.forward(from: 0);
+  }
+
+  Offset get _activeDrag => _springBack.isAnimating
+      ? _dragAtRelease * (1 - Curves.elasticOut.transform(_springBack.value))
+      : _drag;
+
   @override
   void dispose() {
+    _tiltSub?.cancel();
     _material.dispose();
-    _swap.dispose();
-    _punch.dispose();
+    _type.dispose();
+    _depth.dispose();
+    _springBack.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_material, _swap, _punch]),
+    final numeral = AnimatedBuilder(
+      animation: Listenable.merge([_material, _type, _depth, _springBack]),
       builder: (context, _) {
-        final material = _currentMaterial;
-        final t = _swap.value;
-        final punch = _punch.isAnimating ? 1 + _punchAmount * math.sin(math.pi * _punch.value) : 1.0;
-
-        final swapping = _swap.isAnimating && _previousText != null;
-        final incoming = SculptedNumeral(
-          text: widget.text,
-          material: material,
-          depth: swapping ? _rise.transform(t).clamp(0.0, 1.2) : 1,
-          lite: widget.lite,
+        final material = GlyphMaterial.lerp(
+          _from,
+          widget.material,
+          _materialCurve.transform(_material.value),
         );
-        if (!swapping) {
-          return Transform.scale(scale: punch, child: incoming);
-        }
 
-        // Old numeral sinks and fades over the first half; the new one rises
-        // with overshoot and fades in quickly.
-        final sink = Curves.easeInCubic.transform((t * 2).clamp(0.0, 1.0));
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (sink < 1)
-              Opacity(
-                opacity: 1 - sink,
-                child: Transform.scale(
-                  scale: 1 - 0.04 * sink,
-                  child: SculptedNumeral(
-                    text: _previousText!,
-                    material: material,
-                    depth: 1 - sink,
-                    lite: widget.lite,
-                  ),
-                ),
+        // Drag and device tilt combined, as in Pop Calc.
+        final drag = _activeDrag;
+        final tilt = Offset(
+          (drag.dx + _sensor.dx * 0.45).clamp(-1.2, 1.2),
+          (drag.dy + _sensor.dy * 0.45).clamp(-1.2, 1.2),
+        );
+        // The light swings with the tilt, so the extrusion shifts naturally.
+        final light = defaultLightDir - tilt * 0.6;
+
+        // Type-up: rise, squash and stretch.
+        final t = _type.value;
+        final ease = Curves.easeOutBack.transform(t);
+        final rise = (1 - ease) * 26;
+        final scaleY = 0.86 + 0.14 * ease;
+        final scaleX = 1.06 - 0.06 * ease;
+        final depth = Curves.easeOutBack.transform(_depth.value).clamp(0.0, 1.15);
+
+        return Transform.translate(
+          offset: Offset(0, rise),
+          child: Transform(
+            alignment: Alignment.bottomCenter,
+            transform: Matrix4.diagonal3Values(scaleX, scaleY, 1),
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0010) // camera perspective
+                ..rotateX(-tilt.dy * 0.28)
+                ..rotateY(tilt.dx * 0.28),
+              child: SculptedNumeral(
+                text: widget.text,
+                material: material,
+                depth: depth,
+                lite: widget.lite,
+                lightDir: Offset(light.dx, light.dy) / math.max(light.distance, 0.001),
               ),
-            Opacity(
-              opacity: (t / 0.3).clamp(0.0, 1.0),
-              child: Transform.scale(scale: 0.96 + 0.04 * t, child: incoming),
             ),
-          ],
+          ),
         );
       },
     );
+    if (!widget.interactive) return numeral;
+    return GestureDetector(
+      onPanStart: _onPanStart,
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _release,
+      onPanCancel: _release,
+      child: numeral,
+    );
   }
-}
-
-/// A spring from 0 to 1 sampled over [duration], overshoot included.
-class _SpringCurve extends Curve {
-  _SpringCurve(SpringDescription spring, Duration duration)
-    : _sim = SpringSimulation(spring, 0, 1, 0),
-      _seconds = duration.inMicroseconds / Duration.microsecondsPerSecond;
-
-  final SpringSimulation _sim;
-  final double _seconds;
-
-  @override
-  double transformInternal(double t) => _sim.x(t * _seconds);
 }

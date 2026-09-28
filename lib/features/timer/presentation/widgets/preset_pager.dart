@@ -4,8 +4,11 @@ import '../../../../core/render/glyph_renderer.dart';
 import 'sculpted_numeral.dart';
 import 'timer_layout.dart';
 
-/// Vertical snapping pager: one page per preset (minutes), then the `+`
-/// stopwatch page at the bottom. Neighbours peek from the edges.
+/// Vertical snapping pager, smallest at the bottom: `+` (stopwatch) at the
+/// very bottom, then 1, 2, 3 ... going up. Neighbours peek from the edges.
+///
+/// Indices in the API are preset indices (`presets.length` is `+`); pages
+/// are laid out reversed, with page 0 at the bottom.
 class PresetPager extends StatefulWidget {
   final List<int> presets;
   final int initialIndex;
@@ -35,8 +38,12 @@ class PresetPager extends StatefulWidget {
 }
 
 class _PresetPagerState extends State<PresetPager> {
+  /// Page 0 (bottom) is +, page n is preset n - 1.
+  int _pageFor(int index) => index >= widget.presets.length ? 0 : index + 1;
+  int _indexFor(int page) => page == 0 ? widget.presets.length : page - 1;
+
   late final PageController _controller = PageController(
-    initialPage: widget.initialIndex,
+    initialPage: _pageFor(widget.initialIndex),
     viewportFraction: TimerLayout.pageFraction,
   );
 
@@ -58,9 +65,11 @@ class _PresetPagerState extends State<PresetPager> {
           physics: widget.enabled
               ? const _PageSnapPhysics()
               : const NeverScrollableScrollPhysics(),
-          onPageChanged: widget.onPageChanged,
+          reverse: true,
+          onPageChanged: (page) => widget.onPageChanged?.call(_indexFor(page)),
           itemCount: pageCount,
-          itemBuilder: (context, index) {
+          itemBuilder: (context, page) {
+            final index = _indexFor(page);
             final isStopwatch = index == PresetPager.stopwatchIndex(widget.presets);
             final text = PresetPager.labelFor(widget.presets, index);
             return Semantics(

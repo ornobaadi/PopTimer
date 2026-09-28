@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'core/platform/platform_providers.dart';
 import 'core/storage/session_store.dart';
+import 'core/storage/settings_store.dart';
+import 'features/settings/application/settings_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +27,10 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [sessionStoreProvider.overrideWithValue(PrefsSessionStore(prefs))],
+      overrides: [
+        sessionStoreProvider.overrideWithValue(PrefsSessionStore(prefs)),
+        settingsStoreProvider.overrideWithValue(PrefsSettingsStore(prefs)),
+      ],
       child: const PopTimerApp(),
     ),
   );

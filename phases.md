@@ -101,7 +101,7 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
 ## Phase 5: Free feature completion and closed-test build
 
 - [ ] Custom duration picker with recents, opened by holding in Browse.
-- [ ] Settings sheet (Pop Calc layout): haptics, minute tick haptic, alarm sound, keep screen on, Lite effects.
+- [ ] Settings sheet (Pop Calc layout): haptics, minute tick haptic, alarm sound, keep screen on, Lite effects. Skins, haptics, tilt and Lite shipped early (before Phase 4); alarm sound and keep screen on still to add.
 - [ ] Accessibility pass: Semantics, custom actions for holds, announcements.
 - [ ] App icon (adaptive + monochrome), splash, notification small icon, all in the Pop Calc family.
 - [ ] Release build with R8, upload to the closed testing track.

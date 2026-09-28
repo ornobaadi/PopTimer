@@ -60,7 +60,7 @@ void main() {
     expect(app.sound.ringing, isFalse);
   });
 
-  testWidgets('tap pauses (blinking, dimmed), time stands still, tap resumes', (tester) async {
+  testWidgets('tap pauses (blinking), time stands still, tap resumes', (tester) async {
     final app = AppHarness(tester);
     await app.pumpApp();
     await app.tap();
@@ -68,7 +68,6 @@ void main() {
     await app.tap();
 
     expect(tester.widget<SessionView>(find.byType(SessionView)).blinkLine, isTrue);
-    expect(tester.widget<SpeedLines>(find.byType(SpeedLines)).paused, isTrue);
     await app.advance(const Duration(minutes: 10));
     expect(find.text('4:42'), findsOneWidget);
 
@@ -93,7 +92,7 @@ void main() {
   });
 
   testWidgets('+ page starts the stopwatch on Paper; hold resets', (tester) async {
-    final app = AppHarness(tester, lastPreset: 90);
+    final app = AppHarness(tester, lastPreset: 1);
     await app.pumpApp();
     await tester.fling(find.byType(PageView), const Offset(0, -300), 1500);
     await app.settle();
@@ -106,6 +105,49 @@ void main() {
 
     await app.press(const Duration(milliseconds: 700));
     expect(find.byType(BrowseView), findsOneWidget);
+  });
+
+  testWidgets('settings ring opens the sheet; picking Andy switches the skin', (tester) async {
+    final app = AppHarness(tester);
+    await app.pumpApp();
+    await tester.tap(find.bySemanticsLabel('Settings'));
+    await app.settle();
+
+    expect(find.text('SKINS'), findsOneWidget);
+    expect(find.byType(BrowseView), findsOneWidget, reason: 'the tap did not start a timer');
+    await tester.tap(find.text('ANDY'));
+    await app.settle();
+    final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+    expect(scaffold.backgroundColor, const Color(0xFFFFAE00));
+  });
+
+  testWidgets('dragging the numeral tilts it without pausing or cancelling', (tester) async {
+    final app = AppHarness(tester);
+    await app.pumpApp();
+    await app.tap();
+    final gesture = await tester.startGesture(tester.getCenter(find.byType(Scaffold)));
+    for (var i = 0; i < 40; i++) {
+      await gesture.moveBy(const Offset(4, 2));
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    await gesture.up();
+    await app.settle();
+
+    expect(find.byType(SessionView), findsOneWidget);
+    expect(tester.widget<SessionView>(find.byType(SessionView)).blinkLine, isFalse);
+  });
+
+  testWidgets('the swoosh plays on start only, not when a timer is restored', (tester) async {
+    final app = AppHarness(
+      tester,
+      session: TimerSession.start(
+        now: DateTime.utc(2026, 1, 1, 11, 59),
+        duration: const Duration(minutes: 5),
+        presetMinutes: 5,
+      ),
+    );
+    await app.pumpApp();
+    expect(find.byType(SpeedLines), findsNothing);
   });
 
   testWidgets('Reduce Motion: static speed lines, still works', (tester) async {

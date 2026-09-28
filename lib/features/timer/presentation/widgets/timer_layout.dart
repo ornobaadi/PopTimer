@@ -11,6 +11,4 @@ class TimerLayout {
   /// Gap between the numeral's bottom and the countdown line.
   static const double lineGap = 24;
 
-  /// Centre of the TAP TO START hint, as an [Alignment] y.
-  static const double hintAlignY = 0.22;
 }
