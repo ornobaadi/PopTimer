@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -53,11 +52,6 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
     duration: AnimatedNumeral.typeUp,
     value: 1,
   );
-  late final AnimationController _depth = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 240),
-    value: 1,
-  );
   late final AnimationController _springBack = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 600),
@@ -108,7 +102,6 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
     }
     if (old.text != widget.text && !widget.reduceMotion) {
       _type.forward(from: 0);
-      _depth.forward(from: 0.15);
     }
   }
 
@@ -143,7 +136,6 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
     _tiltSub?.cancel();
     _material.dispose();
     _type.dispose();
-    _depth.dispose();
     _springBack.dispose();
     super.dispose();
   }
@@ -151,13 +143,11 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     final numeral = AnimatedBuilder(
-      animation: Listenable.merge([_material, _type, _depth, _springBack]),
+      animation: Listenable.merge([_material, _type, _springBack]),
       builder: (context, _) {
-        final material = GlyphMaterial.lerp(
-          _from,
-          widget.material,
-          _materialCurve.transform(_material.value),
-        );
+        // Material changes cross-fade two cached numerals instead of
+        // re-rendering one per frame.
+        final fade = _materialCurve.transform(_material.value);
 
         // Drag and device tilt combined, as in Pop Calc.
         final drag = _activeDrag;
@@ -165,16 +155,12 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
           (drag.dx + _sensor.dx * 0.45).clamp(-1.2, 1.2),
           (drag.dy + _sensor.dy * 0.45).clamp(-1.2, 1.2),
         );
-        // The light swings with the tilt, so the extrusion shifts naturally.
-        final light = defaultLightDir - tilt * 0.6;
-
         // Type-up: rise, squash and stretch.
         final t = _type.value;
         final ease = Curves.easeOutBack.transform(t);
         final rise = (1 - ease) * 26;
         final scaleY = 0.86 + 0.14 * ease;
         final scaleX = 1.06 - 0.06 * ease;
-        final depth = Curves.easeOutBack.transform(_depth.value).clamp(0.0, 1.15);
 
         return Transform.translate(
           offset: Offset(0, rise),
@@ -187,13 +173,22 @@ class _AnimatedNumeralState extends State<AnimatedNumeral> with TickerProviderSt
                 ..setEntry(3, 2, 0.0010) // camera perspective
                 ..rotateX(-tilt.dy * 0.28)
                 ..rotateY(tilt.dx * 0.28),
-              child: SculptedNumeral(
-                text: widget.text,
-                material: material,
-                depth: depth,
-                lite: widget.lite,
-                lightDir: Offset(light.dx, light.dy) / math.max(light.distance, 0.001),
-              ),
+              child: fade >= 1
+                  ? SculptedNumeral(text: widget.text, material: widget.material, lite: widget.lite)
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        SculptedNumeral(text: widget.text, material: _from, lite: widget.lite),
+                        Opacity(
+                          opacity: fade,
+                          child: SculptedNumeral(
+                            text: widget.text,
+                            material: widget.material,
+                            lite: widget.lite,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         );

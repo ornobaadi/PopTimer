@@ -57,9 +57,9 @@ class GlyphMaterial {
   int get hashCode => Object.hash(face, side, bevelLight, bevelDark, castShadow);
 }
 
-/// Default key light: top-left, so the block and shadow fall toward the
-/// bottom-right, as in Pop Calc.
-const Offset defaultLightDir = Offset(-0.5571, -0.8305);
+/// Default key light: top-right, so the block and the long shadow fall
+/// toward the bottom-left, as in the references.
+const Offset defaultLightDir = Offset(0.7071, -0.7071);
 
 abstract interface class GlyphRenderer {
   void paint(
@@ -70,5 +70,6 @@ abstract interface class GlyphRenderer {
     required double depth,
     Offset lightDir,
     bool lite,
+    double devicePixelRatio,
   });
 }

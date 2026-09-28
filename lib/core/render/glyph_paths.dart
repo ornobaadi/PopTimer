@@ -48,7 +48,9 @@ class GlyphRun {
 
 const double _w = 28; // digit advance
 const double _h = glyphUnitHeight;
-const double _digitBevel = 2.0;
+// Close to half the 10-unit stroke, so the facets nearly meet in a ridge:
+// chiseled, like the `+`.
+const double _digitBevel = 4.2;
 
 List<Offset> _pts(List<double> xy) => [
   for (var i = 0; i < xy.length; i += 2) Offset(xy[i], xy[i + 1]),
@@ -85,12 +87,8 @@ final GlyphShape _six = _digit(
 
 final Map<String, GlyphShape> glyphShapes = {
   '0': _digit(
-    [
-      [6, 0, 22, 0, 28, 6, 28, 94, 22, 100, 6, 100, 0, 94, 0, 6],
-    ],
-    holes: [
-      [13, 10, 15, 10, 18, 13, 18, 87, 15, 90, 13, 90, 10, 87, 10, 13],
-    ],
+    [_roundRect(0, 0, 28, 100, 14)],
+    holes: [_roundRect(10, 10, 18, 90, 4)],
   ),
   '1': _digit([
     [11, 0, 21, 0, 21, 100, 11, 100, 11, 22, 3, 27, 3, 14],
@@ -210,4 +208,33 @@ Path contoursToPath(Iterable<GlyphContour> contours, {Offset shift = Offset.zero
     path.addPolygon([for (final p in c.points) p + shift], true);
   }
   return path;
+}
+
+/// A rounded rectangle as a flat x,y list, clockwise on screen, each corner
+/// an arc of [segments] steps (the facet lighting shades it like a tube).
+List<double> _roundRect(double x0, double y0, double x1, double y1, double r, [int segments = 7]) {
+  final out = <double>[];
+  void arc(double cx, double cy, double from) {
+    for (var i = 0; i <= segments; i++) {
+      final a = from + (math.pi / 2) * i / segments;
+      final x = cx + r * math.cos(a);
+      final y = cy + r * math.sin(a);
+      // Adjacent arcs can share an endpoint; a repeated point would make a
+      // zero-length edge with no normal.
+      final n = out.length;
+      if (n >= 2 && (out[n - 2] - x).abs() < 1e-6 && (out[n - 1] - y).abs() < 1e-6) continue;
+      out
+        ..add(x)
+        ..add(y);
+    }
+  }
+
+  arc(x1 - r, y0 + r, -math.pi / 2); // top-right
+  arc(x1 - r, y1 - r, 0); // bottom-right
+  arc(x0 + r, y1 - r, math.pi / 2); // bottom-left
+  arc(x0 + r, y0 + r, math.pi); // top-left
+  if ((out[0] - out[out.length - 2]).abs() < 1e-6 && (out[1] - out.last).abs() < 1e-6) {
+    out.removeRange(out.length - 2, out.length);
+  }
+  return out;
 }

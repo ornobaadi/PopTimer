@@ -38,6 +38,7 @@ class SculptedNumeral extends StatelessWidget {
             depth: depth,
             lite: lite,
             lightDir: lightDir,
+            devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
           ),
         ),
       ),
@@ -52,6 +53,7 @@ class _NumeralPainter extends CustomPainter {
   final double depth;
   final bool lite;
   final Offset lightDir;
+  final double devicePixelRatio;
 
   _NumeralPainter({
     required this.renderer,
@@ -60,6 +62,7 @@ class _NumeralPainter extends CustomPainter {
     required this.depth,
     required this.lite,
     required this.lightDir,
+    required this.devicePixelRatio,
   });
 
   @override
@@ -71,6 +74,7 @@ class _NumeralPainter extends CustomPainter {
     depth: depth,
     lite: lite,
     lightDir: lightDir,
+    devicePixelRatio: devicePixelRatio,
   );
 
   @override
@@ -79,5 +83,6 @@ class _NumeralPainter extends CustomPainter {
       old.material != material ||
       old.depth != depth ||
       old.lite != lite ||
+      old.devicePixelRatio != devicePixelRatio ||
       old.lightDir != lightDir;
 }

@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
-import 'package:flutter/animation.dart' show Curves;
 import 'package:flutter/painting.dart';
 
 import 'glyph_paths.dart';
@@ -15,18 +14,23 @@ import 'glyph_renderer.dart';
 /// 3. front face with a faint top-lit gradient
 /// 4. chamfer facets, lit or shaded by which way each edge faces the light
 ///
-/// Every pass is plain path filling except the shadow's one blur layer, and
-/// the finished glyph is cached as a [Picture], so a static numeral (most of
-/// a running timer) is a single picture replay.
+/// Each finished glyph (shadow, blur and all) is rasterised once into a GPU
+/// image at device resolution and cached, so every later frame, whether
+/// paging, animating, dragging or tilting, is a single image blit. Motion
+/// happens in widget transforms, never by re-rendering.
 class ProceduralGlyphRenderer implements GlyphRenderer {
-  ProceduralGlyphRenderer({this.cacheSize = 24});
+  ProceduralGlyphRenderer({this.cacheSize = 12});
 
   final int cacheSize;
   // Map literals keep insertion order, so the first key is the oldest.
-  final _cache = <String, ui.Picture>{};
+  final _cache = <String, _Baked>{};
 
   /// Share of the box width a numeral may use before it shrinks.
   static const double maxWidthFraction = 0.84;
+
+  /// Rasterisation cap: sharper than this is invisible at numeral sizes and
+  /// just costs memory.
+  static const double maxPixelRatio = 2.5;
 
   @override
   void paint(
@@ -37,30 +41,70 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
     required double depth,
     Offset lightDir = defaultLightDir,
     bool lite = false,
+    double devicePixelRatio = 1,
   }) {
     if (text.isEmpty || size.isEmpty) return;
+    final ratio = math.min(devicePixelRatio, maxPixelRatio);
     final key = [
       text,
       size.width.round(),
       size.height.round(),
+      ratio,
       material.hashCode,
-      (depth * 100).round(),
+      (depth * 20).round(), // 5% steps: depth is only animated rarely
       lightDir.dx.toStringAsFixed(2),
       lightDir.dy.toStringAsFixed(2),
       lite,
     ].join('|');
 
-    var picture = _cache.remove(key);
-    if (picture == null) {
-      final recorder = ui.PictureRecorder();
-      _draw(Canvas(recorder), size, text, material, depth, lightDir, lite);
-      picture = recorder.endRecording();
+    var baked = _cache.remove(key);
+    if (baked == null) {
+      baked = _bake(size, ratio, text, material, (depth * 20).round() / 20, lightDir, lite);
       if (_cache.length >= cacheSize) {
-        _cache.remove(_cache.keys.first)?.dispose();
+        _cache.remove(_cache.keys.first)?.image.dispose();
       }
     }
-    _cache[key] = picture;
-    canvas.drawPicture(picture);
+    _cache[key] = baked;
+    canvas.drawImageRect(
+      baked.image,
+      Rect.fromLTWH(0, 0, baked.image.width.toDouble(), baked.image.height.toDouble()),
+      baked.bounds,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  /// Renders into an image large enough for the shadow spilling past [size].
+  _Baked _bake(
+    Size size,
+    double ratio,
+    String text,
+    GlyphMaterial m,
+    double depth,
+    Offset lightDir,
+    bool lite,
+  ) {
+    final h = size.height;
+    final light = _normalize(lightDir);
+    final shadow = _normalize(Offset(-light.dx * 0.78, -light.dy)) * h * 0.3;
+    final pad = h * 0.08;
+    final left = pad + math.max(0.0, -shadow.dx);
+    final right = pad + math.max(0.0, shadow.dx);
+    final top = pad + math.max(0.0, -shadow.dy);
+    final bottom = pad + math.max(0.0, shadow.dy);
+    final bounds = Rect.fromLTWH(-left, -top, size.width + left + right, h + top + bottom);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder)
+      ..scale(ratio)
+      ..translate(left, top);
+    _draw(canvas, size, text, m, depth, lightDir, lite);
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(
+      (bounds.width * ratio).ceil(),
+      (bounds.height * ratio).ceil(),
+    );
+    picture.dispose();
+    return _Baked(image, bounds);
   }
 
   void _draw(
@@ -72,10 +116,6 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
     Offset lightDir,
     bool lite,
   ) {
-    if (text != '+') {
-      _drawText(canvas, size, text, m, depth, lightDir, lite);
-      return;
-    }
     final run = layoutGlyphs(text);
     if (run.contours.isEmpty) return;
 
@@ -177,109 +217,6 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
     }
   }
 
-  /// Bebas Neue digit height as a share of font size.
-  static const double _capRatio = 0.7;
-
-  TextPainter _painter(String text, double fontSize, {Color? color, Paint? foreground}) =>
-      TextPainter(
-        text: TextSpan(
-          text: text,
-          style: TextStyle(
-            fontFamily: 'BebasNeue',
-            fontFamilyFallback: const ['Antonio'],
-            fontSize: fontSize,
-            height: 1,
-            letterSpacing: fontSize * 0.01,
-            color: foreground == null ? color : null,
-            foreground: foreground,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-
-  /// Digits the Pop Calc way: the Bebas Neue numeral extruded as a solid
-  /// block (stacked layers shaded from the deep side toward the rim), a long
-  /// blurred cast shadow, a top-lit face and a catch-light rim.
-  void _drawText(
-    Canvas canvas,
-    Size size,
-    String text,
-    GlyphMaterial m,
-    double depth,
-    Offset lightDir,
-    bool lite,
-  ) {
-    var fontSize = size.height / _capRatio;
-    var probe = _painter(text, fontSize, color: m.face);
-    final maxWidth = size.width * maxWidthFraction;
-    if (probe.width > maxWidth) {
-      fontSize *= maxWidth / probe.width;
-      probe = _painter(text, fontSize, color: m.face);
-    }
-    final glyphH = fontSize * _capRatio;
-    final light = _normalize(lightDir);
-    // Pop Calc proportions: a chunky block (~9% of the digit height) and a
-    // soft contact shadow just beyond it, both falling away from the light.
-    final extrude = _normalize(-light) * glyphH * 0.09 * depth;
-    final shadow = extrude * 1.5;
-
-    final baseline = probe.computeDistanceToActualBaseline(TextBaseline.alphabetic);
-    final inkTop = baseline - glyphH;
-    final origin = Offset(
-      (size.width - probe.width) / 2 - extrude.dx / 2,
-      (size.height - glyphH) / 2 - inkTop - extrude.dy / 2,
-    );
-
-    // 1. Soft ambient contact shadow.
-    if (depth > 0.05 && !lite) {
-      final sigma = glyphH * 0.035;
-      _painter(
-        text,
-        fontSize,
-        foreground: Paint()
-          ..color = m.castShadow
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma),
-      ).paint(canvas, origin + shadow);
-    }
-
-    // 2. Side walls: stacked layers from the far end to the face, shaded
-    //    from the side colour up to a lighter rim (Pop Calc's gradient).
-    //    Colours are grouped so only a handful of paragraphs are laid out.
-    final dist = extrude.distance;
-    if (dist > 0.5) {
-      final steps = lite ? 12 : (dist / 0.5).clamp(24, 72).round();
-      const groups = 10;
-      final rim = Color.lerp(m.side, m.face, 0.28)!;
-      TextPainter? layer;
-      var layerGroup = -1;
-      for (var i = 0; i < steps; i++) {
-        final t = i / (steps - 1);
-        final group = (t * (groups - 1)).round();
-        if (group != layerGroup) {
-          layerGroup = group;
-          final c = Color.lerp(m.side, rim, Curves.easeInCubic.transform(group / (groups - 1)))!;
-          layer = _painter(text, fontSize, color: c);
-        }
-        layer!.paint(canvas, origin + extrude * (1 - t));
-      }
-    }
-
-    // 3. Crisp front face.
-    _painter(text, fontSize, color: m.face).paint(canvas, origin);
-
-    // 4. Barely-there 1 px catch light on the face rim.
-    if (!lite) {
-      _painter(
-        text,
-        fontSize,
-        foreground: Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = m.bevelLight,
-      ).paint(canvas, origin);
-    }
-  }
-
   /// Fills the band each edge of [pts] sweeps when moved by [by]. Every band
   /// is wound the same way so the non-zero fill is a clean union.
   static void _sweep(Canvas canvas, List<Offset> pts, Offset by, Paint paint) {
@@ -299,4 +236,13 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
   }
 
   static double _dot(Offset a, Offset b) => a.dx * b.dx + a.dy * b.dy;
+}
+
+class _Baked {
+  const _Baked(this.image, this.bounds);
+
+  final ui.Image image;
+
+  /// Where the image goes, relative to the numeral's box.
+  final Rect bounds;
 }

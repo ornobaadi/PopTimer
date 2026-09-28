@@ -37,7 +37,9 @@ String bigNumeral(Session s, DateTime now) {
       return '$secs';
     case StopwatchSession():
       final e = elapsed(s, now);
-      if (e < const Duration(minutes: 1)) return '+';
+      // + for the first second, then seconds, then minutes.
+      if (e < const Duration(seconds: 1)) return '+';
+      if (e < const Duration(minutes: 1)) return '${e.inSeconds}';
       final minutes = e.inMinutes;
       return '${minutes > maxStopwatchNumeral ? maxStopwatchNumeral : minutes}';
   }
@@ -73,6 +75,9 @@ DateTime? nextBoundary(Session s, DateTime now) {
     case StopwatchSession():
       final e = elapsed(s, utcNow);
       if (e.inMinutes >= maxStopwatchNumeral) return null;
+      if (e < const Duration(minutes: 1)) {
+        return utcNow.add(Duration(seconds: e.inSeconds + 1) - e);
+      }
       return utcNow.add(Duration(minutes: e.inMinutes + 1) - e);
   }
 }

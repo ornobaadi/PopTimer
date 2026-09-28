@@ -49,9 +49,9 @@ void main() {
     }
   });
 
-  test('top edge of 0 faces up, so the key light catches it', () {
-    final outline = glyphShapes['0']!.contours.first;
-    // Edge 0 runs along the top from (6, 0) to (22, 0).
+  test('top edge of 4 faces up, so the key light catches it', () {
+    final outline = glyphShapes['4']!.contours.first;
+    // Edge 0 runs along the top from (0, 0) to (10, 0).
     expect(-materialNormals(outline)[0], const Offset(0, -1));
   });
 

@@ -160,11 +160,15 @@ void main() {
   });
 
   group('stopwatch', () {
-    test('+ under a minute, then elapsed minutes', () {
+    test('+ at zero, then seconds, then elapsed minutes', () {
       final s = StopwatchSession.start(clock.now());
       expect((numeral(s), line(s)), ('+', '+00:00:00'));
-      clock.advance(const Duration(seconds: 59));
+      clock.advance(const Duration(milliseconds: 999));
       expect(numeral(s), '+');
+      clock.advance(const Duration(milliseconds: 1));
+      expect(numeral(s), '1');
+      clock.advance(const Duration(seconds: 58));
+      expect(numeral(s), '59');
       clock.advance(const Duration(seconds: 1));
       expect(numeral(s), '1');
       clock.advance(const Duration(minutes: 2, seconds: 16));
@@ -222,10 +226,12 @@ void main() {
       expect(nextBoundary(stopwatch, clock.now()), isNull);
     });
 
-    test('stopwatch points at the next whole minute', () {
+    test('stopwatch points at the next second, then the next minute', () {
       final s = StopwatchSession.start(clock.now());
+      clock.advance(const Duration(milliseconds: 300));
+      expect(nextBoundary(s, clock.now()), clock.now().add(const Duration(milliseconds: 700)));
       clock.advance(const Duration(seconds: 75));
-      expect(nextBoundary(s, clock.now()), clock.now().add(const Duration(seconds: 45)));
+      expect(nextBoundary(s, clock.now()), clock.now().add(const Duration(seconds: 44, milliseconds: 700)));
     });
   });
 

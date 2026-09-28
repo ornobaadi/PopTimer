@@ -129,8 +129,8 @@ class _SessionStageState extends ConsumerState<SessionStage> with TickerProvider
       } else if (secs >= 59) {
         haptics.minuteTick();
       }
-    } else {
-      haptics.minuteTick();
+    } else if (elapsed(s, now) >= const Duration(minutes: 1)) {
+      haptics.minuteTick(); // the first minute counts seconds silently
     }
   }
 
