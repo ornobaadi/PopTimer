@@ -217,55 +217,39 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
       probe = _painter(text, fontSize, color: m.face);
     }
     final glyphH = fontSize * _capRatio;
-    // Width-fitted numbers (two or three digits) are stretched back up to
-    // the full height: tall, condensed Bebas, like the references.
-    final stretch = (size.height / glyphH).clamp(1.0, maxStretch);
     final light = _normalize(lightDir);
-    // Offsets are drawn in the stretched space, so undo the stretch on y to
-    // keep the extrusion and shadow the same length in every direction.
-    Offset unstretched(Offset o) => Offset(o.dx, o.dy / stretch);
-    final extrude = unstretched(_normalize(-light) * glyphH * stretch * 0.06 * depth);
-    final shadow = unstretched(
-      _normalize(Offset(-light.dx * 0.78, -light.dy)) * glyphH * stretch * 0.2 * depth,
-    );
+    // Pop Calc proportions: a chunky block (~9% of the digit height) and a
+    // soft contact shadow just beyond it, both falling away from the light.
+    final extrude = _normalize(-light) * glyphH * 0.09 * depth;
+    final shadow = extrude * 1.5;
 
     final baseline = probe.computeDistanceToActualBaseline(TextBaseline.alphabetic);
     final inkTop = baseline - glyphH;
-    canvas.save();
-    canvas.translate(0, size.height / 2);
-    canvas.scale(1, stretch);
-    canvas.translate(0, -size.height / 2);
     final origin = Offset(
       (size.width - probe.width) / 2 - extrude.dx / 2,
       (size.height - glyphH) / 2 - inkTop - extrude.dy / 2,
     );
 
-    // 1. Long cast shadow: the glyph stamped along [shadow], one layer.
-    if (depth > 0.01) {
-      final alpha = lite ? 0.3 : m.castShadow.a;
-      final layer = Paint()..color = Color.fromRGBO(0, 0, 0, alpha);
-      if (!lite) {
-        final sigma = glyphH * 0.02;
-        layer.imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
-      }
-      canvas.saveLayer(null, layer);
-      final stamp = _painter(text, fontSize, color: m.castShadow.withValues(alpha: 1));
-      const stamps = 10;
-      for (var i = 0; i <= stamps; i++) {
-        stamp.paint(canvas, origin + shadow * (i / stamps));
-      }
-      canvas.restore();
+    // 1. Soft ambient contact shadow.
+    if (depth > 0.05 && !lite) {
+      final sigma = glyphH * 0.035;
+      _painter(
+        text,
+        fontSize,
+        foreground: Paint()
+          ..color = m.castShadow
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma),
+      ).paint(canvas, origin + shadow);
     }
 
-    // 2. Side walls: stacked layers from the far end to the face, darkest at
-    //    the back, catching a little light near the rim. Colors are grouped
-    //    so only a handful of paragraphs are laid out.
+    // 2. Side walls: stacked layers from the far end to the face, shaded
+    //    from the side colour up to a lighter rim (Pop Calc's gradient).
+    //    Colours are grouped so only a handful of paragraphs are laid out.
     final dist = extrude.distance;
     if (dist > 0.5) {
-      final steps = lite ? 8 : (dist / 0.6).clamp(24, 64).round();
-      const groups = 8;
+      final steps = lite ? 12 : (dist / 0.5).clamp(24, 72).round();
+      const groups = 10;
       final rim = Color.lerp(m.side, m.face, 0.28)!;
-      final deep = Color.lerp(m.side, const Color(0xFF000000), 0.35)!;
       TextPainter? layer;
       var layerGroup = -1;
       for (var i = 0; i < steps; i++) {
@@ -273,43 +257,28 @@ class ProceduralGlyphRenderer implements GlyphRenderer {
         final group = (t * (groups - 1)).round();
         if (group != layerGroup) {
           layerGroup = group;
-          final c = Color.lerp(deep, rim, Curves.easeInCubic.transform(group / (groups - 1)))!;
+          final c = Color.lerp(m.side, rim, Curves.easeInCubic.transform(group / (groups - 1)))!;
           layer = _painter(text, fontSize, color: c);
         }
         layer!.paint(canvas, origin + extrude * (1 - t));
       }
     }
 
-    // 3. Face, a touch lighter at the top.
-    final faceRect = Rect.fromLTWH(origin.dx, origin.dy + inkTop, probe.width, glyphH);
-    _painter(
-      text,
-      fontSize,
-      foreground: Paint()
-        ..shader = ui.Gradient.linear(faceRect.topCenter, faceRect.bottomCenter, [
-          Color.lerp(m.face, const Color(0xFFFFFFFF), 0.05)!,
-          m.face,
-        ]),
-    ).paint(canvas, origin);
+    // 3. Crisp front face.
+    _painter(text, fontSize, color: m.face).paint(canvas, origin);
 
-    // 4. Catch-light rim (Pop Calc's chamfer), plus a faint shaded rim offset
-    //    away from the light so edges read even on dark-on-dark.
+    // 4. Barely-there 1 px catch light on the face rim.
     if (!lite) {
-      final w = math.max(1.0, glyphH * 0.004);
       _painter(
         text,
         fontSize,
         foreground: Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = w
+          ..strokeWidth = 1
           ..color = m.bevelLight,
-      ).paint(canvas, origin + light * (w * 0.5));
+      ).paint(canvas, origin);
     }
-    canvas.restore();
   }
-
-  /// Most a width-fitted number is stretched vertically.
-  static const double maxStretch = 1.8;
 
   /// Fills the band each edge of [pts] sweeps when moved by [by]. Every band
   /// is wound the same way so the non-zero fill is a clean union.
