@@ -26,6 +26,7 @@ class SessionStage extends ConsumerStatefulWidget {
   final bool lite;
   final bool reduceMotion;
   final VoidCallback? onSettings;
+  final bool notificationsGranted;
 
   const SessionStage({
     super.key,
@@ -35,6 +36,7 @@ class SessionStage extends ConsumerStatefulWidget {
     this.lite = false,
     this.reduceMotion = false,
     this.onSettings,
+    this.notificationsGranted = true,
   });
 
   /// A session younger than this gets the start swoosh; older ones (resumed,
@@ -166,6 +168,9 @@ class _SessionStageState extends ConsumerState<SessionStage> with TickerProvider
               reduceMotion: widget.reduceMotion,
             )
           : null,
+      footnote: widget.notificationsGranted || mode == Mode.timerDone || mode.isStopwatch
+          ? null
+          : "Allow notifications so the alarm can ring in the background",
       blinkLine: mode.isPaused,
       showSettings: mode.isPaused,
       lite: widget.lite,

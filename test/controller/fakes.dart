@@ -1,6 +1,7 @@
 import 'package:poptimer/core/engine/session.dart';
 import 'package:poptimer/core/platform/alarm_scheduler.dart';
 import 'package:poptimer/core/platform/haptics_service.dart';
+import 'package:poptimer/core/platform/notification_permissions.dart';
 import 'package:poptimer/core/platform/ongoing_notifier.dart';
 import 'package:poptimer/core/platform/sound_service.dart';
 import 'package:poptimer/core/storage/session_store.dart';
@@ -106,4 +107,17 @@ class FakeHaptics implements HapticsService {
   void holdComplete() => events.add('holdComplete');
   @override
   void timeUp() => events.add('timeUp');
+}
+
+class FakePermissions implements NotificationPermissions {
+  FakePermissions({this.grant = true});
+
+  bool grant;
+  int asked = 0;
+
+  @override
+  Future<bool> request() async {
+    asked++;
+    return grant;
+  }
 }

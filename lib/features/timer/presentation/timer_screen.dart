@@ -123,6 +123,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> with WidgetsBindingOb
             lite: lite,
             reduceMotion: reduceMotion,
             onSettings: _openSettings,
+            notificationsGranted: state.notificationsGranted,
           );
 
     return PopScope(

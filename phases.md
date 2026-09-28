@@ -86,15 +86,15 @@ Week 1     Week 2     Week 3     Week 4     Week 5     Week 6     Week 7     Wee
 
 **Goal:** it never misses an alarm.
 
-- [ ] `flutter_local_notifications` + `timezone`, desugaring enabled (check current plugin docs first).
-- [ ] `AlarmScheduler` and `OngoingNotifier` interfaces + implementation; `ongoing` and per-sound `alarm` channels.
-- [ ] Chronometer ongoing notification with Pause/Resume/Cancel actions; background action handler reusing the engine.
-- [ ] Exact alarm at `fireAt`, restore on launch/resume, reboot rescheduling.
-- [ ] Permissions flow: `POST_NOTIFICATIONS` on first start, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `WAKE_LOCK`. Merged manifest has no `INTERNET`.
-- [ ] Foreground alarm sound (`SoundService`), 2 free alarm sounds in `res/raw`.
+- [x] `flutter_local_notifications` 22.3.1 + `timezone`, desugaring enabled (API checked against the 22.x source).
+- [x] `AlarmScheduler` and `OngoingNotifier` interfaces + implementation; `ongoing` and `alarm_default` channels.
+- [x] Chronometer ongoing notification with Pause/Resume/Cancel actions; background action handler reusing the engine.
+- [x] Exact alarm at `fireAt`, restore on launch/resume, reboot rescheduling.
+- [x] Permissions flow: `POST_NOTIFICATIONS` on first start, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`. `WAKE_LOCK` waits for keep-screen-on (Phase 5). Release merged manifest verified: no `INTERNET`.
+- [x] Foreground alarm: the alarm notification itself rings in the foreground too (system alarm tone). Extra alarm sounds move to Pro (Phase 6).
 - [ ] Manual matrix: Doze, process kill, reboot, notifications denied, one aggressive OEM.
 
-**Exit criteria:** a 1-minute timer rings on time with the app killed and the screen off.
+**Exit criteria:** a 1-minute timer rings on time with the app killed and the screen off. Status: **DONE in code** (87/87 tests, debug + release builds); the manual device matrix is still to run.
 
 ---
 

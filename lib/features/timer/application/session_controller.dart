@@ -74,12 +74,14 @@ class SessionController extends Notifier<SessionState> {
         presetMinutes: minutes,
       ),
     );
+    await _askForNotifications();
   }
 
   Future<void> _startStopwatch() async {
     if (state.session != null) return;
     ref.read(hapticsServiceProvider).start();
     await _commit(StopwatchSession.start(_now));
+    await _askForNotifications();
   }
 
   // ─── Running session ─────────────────────────────────────────────────────
@@ -174,6 +176,12 @@ class SessionController extends Notifier<SessionState> {
   });
 
   // ─── Internals ───────────────────────────────────────────────────────────
+
+  /// Starting asks for POST_NOTIFICATIONS; the session runs either way.
+  Future<void> _askForNotifications() async {
+    final granted = await ref.read(notificationPermissionsProvider).request();
+    state = state.copyWith(notificationsGranted: granted);
+  }
 
   Future<void> _commit(Session session) async {
     final now = _now;

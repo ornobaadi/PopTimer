@@ -5,6 +5,7 @@ import '../engine/clock.dart';
 import '../storage/session_store.dart';
 import 'alarm_scheduler.dart';
 import 'haptics_service.dart';
+import 'notification_permissions.dart';
 import 'ongoing_notifier.dart';
 import 'sound_service.dart';
 
@@ -26,4 +27,8 @@ final soundServiceProvider = Provider<SoundService>((ref) => const NoopSoundServ
 
 final hapticsServiceProvider = Provider<HapticsService>(
   (ref) => AppHapticsService(enabled: ref.watch(settingsProvider).hapticsEnabled),
+);
+
+final notificationPermissionsProvider = Provider<NotificationPermissions>(
+  (ref) => const NoopNotificationPermissions(),
 );

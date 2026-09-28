@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/render/glyph_renderer.dart';
 import '../../../core/theme/skin.dart';
+import '../../../core/theme/typography.dart';
 import 'widgets/animated_numeral.dart';
 import 'widgets/countdown_line.dart';
 import 'widgets/settings_ring.dart';
@@ -23,6 +24,8 @@ class SessionView extends StatelessWidget {
 
   /// Painted between the surface and the numeral (speed lines).
   final Widget? backdrop;
+  /// Small note under the countdown line (notifications denied).
+  final String? footnote;
   final bool blinkLine;
   final bool showSettings;
   final bool lite;
@@ -38,6 +41,7 @@ class SessionView extends StatelessWidget {
     required this.semanticsLabel,
     this.deviceTilt,
     this.backdrop,
+    this.footnote,
     this.blinkLine = false,
     this.showSettings = false,
     this.lite = false,
@@ -89,6 +93,17 @@ class SessionView extends StatelessWidget {
                 ),
               ),
             ),
+            if (footnote != null)
+              Positioned(
+                top: lineTop + 40,
+                left: 32,
+                right: 32,
+                child: Text(
+                  footnote!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontFamily: AppType.bodyFamily, fontSize: 13, color: tokens.inkSoft),
+                ),
+              ),
             if (showSettings)
               SafeArea(
                 child: Align(

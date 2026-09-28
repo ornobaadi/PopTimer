@@ -203,6 +203,26 @@ void main() {
     });
   });
 
+  test('starting asks for notifications; denied still runs', () async {
+    final permissions = FakePermissions(grant: false);
+    container = ProviderContainer(
+      overrides: [
+        clockProvider.overrideWithValue(clock),
+        sessionStoreProvider.overrideWithValue(LoggingStore(log)),
+        alarmSchedulerProvider.overrideWithValue(alarm),
+        ongoingNotifierProvider.overrideWithValue(ongoing),
+        soundServiceProvider.overrideWithValue(sound),
+        hapticsServiceProvider.overrideWithValue(haptics),
+        notificationPermissionsProvider.overrideWithValue(permissions),
+      ],
+    );
+    addTearDown(container.dispose);
+    await controller().startTimer();
+    expect(permissions.asked, 1);
+    expect(state().mode, Mode.timerRunning);
+    expect(state().notificationsGranted, isFalse);
+  });
+
   group('stopwatch', () {
     test('+ page starts a stopwatch on Paper', () async {
       await controller().selectPreset(defaultPresets.length);
